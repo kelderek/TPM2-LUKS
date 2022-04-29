@@ -10,7 +10,7 @@ Thanks etzion!
 
 The script has been tested on Ubuntu 20.04 and 22.04 with full disk encryption on LVM.  Your drive must already be encrypted, this script will not do it for you!  If you selected ZFS and encryption during the Ubuntu 22.04 install, it will use ZFS native encryption and not LUKS, so this script will not work.
 
-This will create a new 64 character alpha-numeric random password, store it in the TPM, add it to LUKS for /dev/sda3, and modify initramfs to pull it from the TPM automatically at boot.  The new key is in addition to the any already used for unlocking the drive.
+This will create a new 64 character alpha-numeric random password, store it in the TPM, add it to LUKS for /dev/sda3, and modify initramfs to pull it from the TPM automatically at boot.  The new key is in addition to the any already used for unlocking the drive.  If the TPM unlocks fails at boot, it will revert to asking you for the passphrase.  You can use either the original one you used to encrypt the drive, or the one that was supposed to be in the TPM, if you have it backed up.
 
 If the drive unlocks as expected after using the script, you can optionally remove the original password used to encrypt the drive and rely completely on the random new one stored in the TPM.  If you do this, you should keep a copy of the key somewhere saved on a DIFFERENT system, or printed and stored in a secure location on another system so you can manually enter it at the prompt if something goes wrong. To get a copy of your key for backup purposes, run this command:
 ```
@@ -29,6 +29,7 @@ If booting fails, press esc at the beginning of the boot to get to the grub menu
 ```
 initrd /initrd.img-5.15.0-27-generic.orig
 ```
+If that also fails, you may be able to boot to a previous kernel version under Advanced boot options.
 
 # Known Issues
 1) The script assumes /dev/sda3. If that is not correct in your case, you will need to modify the script
