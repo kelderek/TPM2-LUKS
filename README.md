@@ -35,3 +35,10 @@ If that also fails, you may be able to boot to a previous kernel version under A
 1) The script assumes /dev/sda3. If that is not correct in your case, you will need to modify the script
 2) This only works for TPM 2.0 devices (including AMD fTPM and Intel PTT) but does NOT work for TPM 1.2 devices
 3) Just storing a value in the TPM isn't the best or most secure method.  It is a "good enough" method meant to protect from "normal" threats like a thief stealing your laptop and not a sophisticated attacker with physical and/or root access.  It should also be combined with protections like preventing USB booting and a BIOS password.  See https://run.tournament.org.il/ubuntu-20-04-and-tpm2-encrypted-system-disk/ for further discussion on this from etzion.  If you know how to better use a TPM (e.g. with certificates and/or PCR registers) and would like to contribute, please reach out!
+
+# To Do
+1) More error checking
+2) Ask user at the start of the script if they actually want to make the changes
+3) Detect if TPM area already allocated, if so ask to overwrite or reuse (e.g. for additional drives)
+4) Prompt for drive to encrypt rather than hard coding /dev/sda3 & sda3_crypt
+5) Accept command line parameters
