@@ -41,19 +41,24 @@ echo
 sudo tpm2_nvread 0x1500016 2> /dev/null | diff root.key - > /dev/null
 if [ $? != 0 ]
 then
- echo The root.key file does not match what is stored in the TPM.  Cannot proceed!
- exit
+   echo The root.key file does not match what is stored in the TPM.  Cannot proceed!
+   exit
 fi
 
-echo
-echo Adding the new key to LUKS.  You will need to enter the current passphrase used to unlock the drive...
-echo
-sudo cryptsetup luksAddKey /dev/sda3 root.key
-if [ $? != 0 ]
-then
- echo Something went wrong adding the encryption key.  Maybe the default /dev/sda3 is not correct for your system.  Check /etc/crypttab and/or lsblk to determine your encrypted volume, then update this script with the correct value
- exit
-fi
+# Etzion: Verify that we are using the correct device. Let's itterate over all lines starting with deviceName_crypt -> This is the Ubuntu way
+# Notice we set the same password for all such devices
+for disk in `cat /etc/crypttab | awk '{print $1}' | sed 's/_.*//'`
+do
+    echo
+    echo Adding the new key to LUKS.  You will need to enter the current passphrase used to unlock the drive...
+    echo
+    sudo cryptsetup luksAddKey /dev/${disk} root.key
+    if [ $? != 0 ]
+    then
+        echo Something went wrong adding the encryption key to /dev/${disk}. Check /etc/crypttab and/or lsblk to determine your encrypted volume, then update this script with the correct value
+        exit
+    fi
+done
 
 echo
 echo Removing root.key file for extra security...
@@ -117,6 +122,10 @@ echo
 echo Backing up /etc/crypttab to /etc/crypttab.bak, then updating it to run tpm2-getkey on decrypt...
 echo
 # This will only update the first line of /etc/crypttab.  If multiple updates are needed, they must be done manually.
+if [ `cat /etc/crypttab | wc -l` -gt 1 ]
+then
+    echo "This section only update the first line of /etc/crypttab. It seems there are multiple lines, so please update the file manually."
+fi
 # e.g. this line: sda3_crypt UUID=d4a5a9a4-a2da-4c2e-a24c-1c1f764a66d2 none luks,discard
 # should become : sda3_crypt UUID=d4a5a9a4-a2da-4c2e-a24c-1c1f764a66d2 none luks,discard,keyscript=/usr/local/sbin/tpm2-getkey
 sudo cp /etc/crypttab /etc/crypttab.bak
@@ -142,7 +151,7 @@ echo
 echo If you remove the original password used to encrypt the drive and fail to backup the key in then TPM then experience TPM,
 echo motherboard, or another failure preventing auto-unlock, you WILL LOSE ACCESS TO EVERYTHING ON THE DRIVE!
 echo If you are SURE you have a backup of the key you put in the TPM, here is the command to remove the original password:
-echo cryptsetup luksRemoveKey /dev/sda3
+echo cryptsetup luksRemoveKey /dev/${disk}
 echo
 echo If booting fails, press esc at the beginning of the boot to get to the grub menu.  Edit the Ubuntu entry and add .orig to end
 echo of the initrd line to boot to the original initramfs this one time.
