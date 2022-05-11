@@ -8,7 +8,9 @@ and<br>
 https://run.tournament.org.il/ubuntu-20-04-and-tpm2-encrypted-system-disk/<br>
 Thanks etzion!
 
-The script has been tested on Ubuntu 22.04 with full disk encryption on LVM.  It will likely work on earlier versions back to Ubuntu 18.04, but those haven't been tested.  Your drive must already be encrypted, this script will not do it for you!  If you ZFS encryption instead of LUKS this script will not work for you.
+The script has been tested on Ubuntu 22.04 and 20.04 with full disk encryption on LVM.  Ubuntu 18.04 definitely does not work, for that please use etzion's instructions at https://run.tournament.org.il/ubuntu-18-04-and-tpm2-encrypted-system-disk/.
+
+Your drive must already be encrypted, this script will not do it for you!  If you ZFS encryption instead of LUKS this script will not work for you.
 
 The script will create a new 64 character alpha-numeric random password, store it in the TPM2, add it to LUKS, and modify initramfs to pull it from the TPM2 automatically at boot.  The new key is in addition to the any already used for unlocking the drive.  If the TPM2 unlocks fails at boot, it will revert to asking you for the passphrase.  You can use either the original one you used to encrypt the drive, or the one that was supposed to be in the TPM2.
 
