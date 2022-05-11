@@ -130,7 +130,7 @@ fi
 
 echo
 echo "Installing tpm2-tools..."
-sudo apt install tpm2-tools
+sudo apt install tpm2-tools -y
 
 # Attempt to read from the TPM2 to see if something is already there
 sudo tpm2_nvread 0x1500016 1> /dev/null 2> /dev/null
@@ -307,7 +307,7 @@ do
 		# just the whole line, plus a comma and the keyscript parameter.  Note this stops after the first
 		# match, but that should be fine.  It won't match commented lines, and there should never be duplicate
 		# devices listed in /etc/crypttab
-        sudo sed -i "s%\(^\s*${CRYPTTAB_DEVICE_NAMES[$I]}.*)$%\1,keyscript=/usr/local/sbin/tpm2-getkey%" /etc/crypttab
+        sudo sed -i "s%\(^\s*${CRYPTTAB_DEVICE_NAMES[$I]}.*\)$%\1,keyscript=/usr/local/sbin/tpm2-getkey%" /etc/crypttab
       fi
    fi
 done # for I loop
@@ -332,7 +332,7 @@ echo
 echo "At this point you are ready to reboot and try it out!"
 echo
 echo "If the drive unlocks as expected, you may optionally remove the original password used to encrypt the drive and rely completely on the random new one stored in the TPM2.  If you do this, you should keep a copy of the key somewhere outside this system. E.g. printed and kept locked somewhere safe. To get a copy of the key stored in the TPM2, run this command:"
-echo "echo $(sudo tpm2-nvread 0x1500016)"
+echo 'echo $(sudo tpm2_nvread 0x1500016)'
 echo
 echo "If you remove the original password used to encrypt the drive and don't have a backup copy of the TPM2's key and then experience TPM2, motherboard, or some other failure preventing automatic unlock, you WILL LOSE ACCESS TO EVERYTHING ON THE ENCRYPTED DRIVE(S)! If you are SURE you have a backup of the key you put in the TPM2, and you REALLY want to remove the old password here are the commands for each drive.  Note that this is NOT RECOMMENDED"
 # Iterate over all selected devices
