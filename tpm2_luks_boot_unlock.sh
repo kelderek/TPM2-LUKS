@@ -318,10 +318,10 @@ done # for I loop
 echo
 if [ -f "/boot/initrd.img-$(uname -r).orig" ]
 then
+   echo "Backup of initramfs already exists at /boot/initrd.img-$(uname -r).orig, skipping backup."
+else
    echo "Backup up initramfs to /boot/initrd.img-$(uname -r).orig..."
    sudo cp /boot/initrd.img-$(uname -r) /boot/initrd.img-$(uname -r).orig
-else
-   echo "Backup of initramfs already exists at /boot/initrd.img-$(uname -r).orig, skipping backup."
 fi
 echo "Updating initramfs to support automatic unlocking from the TPM2..."
 sudo mkinitramfs -o /boot/initrd.img-$(uname -r) $(uname -r)
