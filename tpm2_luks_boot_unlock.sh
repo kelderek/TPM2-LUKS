@@ -82,7 +82,7 @@ do
    echo "Drives eligible for automatic unlocking at boot:"
    for I in "${!CRYPTTAB_DEVICE_NAMES[@]}"
    do
-      echo "Index: $I   Selected: ${CRYPTTAB_DEVICE_SELECTED[$I]}   Name: ${CRYPTTAB_DEVICE_NAMES[$I]}   Path: ${CRYPTTAB_DEVICE_PATHS[$I]} $(grep -q "${CRYPTTAB_DEVICE_NAMES[$I]}.*tpm2-getkey" /etc/crypttab && echo " (already setup to automatically unlock at boot)")"
+      echo "Index: $I   Selected: ${CRYPTTAB_DEVICE_SELECTED[$I]}   Name: ${CRYPTTAB_DEVICE_NAMES[$I]}   Path: ${CRYPTTAB_DEVICE_PATHS[$I]} $(grep -q "^\s*${CRYPTTAB_DEVICE_NAMES[$I]}.*,keyscript=/usr/local/sbin/tpm2-getkey" /etc/crypttab && echo " (already setup to automatically unlock at boot)")"
    done  #for I loop
    echo
    echo "Enter the index numbers of devices separated by spaces to select/unselect them, 'a' to select all devices, 'n' to unselect all devices, or 'd' when done selecting:"
@@ -295,7 +295,7 @@ do
    if [ "${CRYPTTAB_DEVICE_SELECTED[$I]}" = "y" ]
    then
       # Check to see if tpm2-getkey has already been added to the device manually or by a previous version
-      grep -q "^\s+${CRYPTTAB_DEVICE_NAMES[$I]}.*,keyscript=/usr/local/sbin/tpm2-getkey" /etc/crypttab
+      grep -q "^\s*${CRYPTTAB_DEVICE_NAMES[$I]}.*,keyscript=/usr/local/sbin/tpm2-getkey" /etc/crypttab
       if [ $? != 0 ]
       then
         # grep did not find /tpm2-getkey on the line for the device, add it
