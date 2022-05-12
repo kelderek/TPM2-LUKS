@@ -179,7 +179,7 @@ else # tpm2_nvread failed, should be safe to generate a new key and store it in 
 fi
 
 echo
-echo "Making sure rook.key and the TPM2 device match..."
+echo "Making sure root.key and the TPM2 device match..."
 sudo tpm2_nvread 0x1500016 2> /dev/null | diff root.key - > /dev/null
 if [ $? != 0 ]
 then
