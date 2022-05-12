@@ -79,7 +79,7 @@ while [ "$SELECTIONS_COMPLETE" = "no" ]
 do
    echo
    echo
-   echo "Drives eligible for automatic unlocking at boot:"
+   echo "Select devices you would like to add automatic unlocking to.  NOTE: Not selecting or unselecting a device does not disable or remove automatic unlocking if it is already setup:"
    for I in "${!CRYPTTAB_DEVICE_NAMES[@]}"
    do
       echo "Index: $I   Selected: ${CRYPTTAB_DEVICE_SELECTED[$I]}   Name: ${CRYPTTAB_DEVICE_NAMES[$I]}   Path: ${CRYPTTAB_DEVICE_PATHS[$I]} $(grep -q "^\s*${CRYPTTAB_DEVICE_NAMES[$I]}.*,keyscript=/usr/local/sbin/tpm2-getkey" /etc/crypttab && echo " (already setup to automatically unlock at boot)")"
