@@ -1,5 +1,5 @@
 # TPM2-LUKS
-Script for using a TPM2 to store a LUKS key and automatically unlock an encrypted system drive at boot.  
+This script uses the TPM2 to store a LUKS key and automatically unlocks an encrypted system partition at boot.  After unlocking the system partition, initrd hands off decryption of the remaining volumes to systemd, which doesn't currently support keyscripts.  That means this script won't work for secondary drives, only the system partition.
 ### Use at your own risk, I make no guarantees and take no responsibility for any damage or loss of data you may suffer as a result of running the script!
 
 Based on:<br>
