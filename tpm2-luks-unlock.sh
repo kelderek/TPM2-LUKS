@@ -184,12 +184,12 @@ echo If the drive unlocks as expected, you may optionally remove the original pa
 echo completely on the random new one stored in the TPM.  If you do this, you should keep a copy of the key somewhere saved on
 echo a DIFFERENT system, or printed and stored in a secure location on another system so you can manually enter it at the prompt.
 echo To get a copy of your key for backup purposes, run this command:
-echo echo \`tpm2_nvread -s ${KEYSIZE} 0x1500016\`
+echo echo \`sudo tpm2_nvread -s ${KEYSIZE} 0x1500016\`
 echo
 echo If you remove the original password used to encrypt the drive and fail to backup the key in then TPM then experience TPM,
 echo motherboard, or another failure preventing auto-unlock, you WILL LOSE ACCESS TO EVERYTHING ON THE DRIVE!
 echo If you are SURE you have a backup of the key you put in the TPM, here is the command to remove the original password:
-echo cryptsetup luksRemoveKey ${TARGET_DEVICE}
+echo sudo cryptsetup luksRemoveKey ${TARGET_DEVICE}
 echo
 echo If booting fails, press esc at the beginning of the boot to get to the grub menu.  Edit the Ubuntu entry and add .orig to end
 echo of the initrd line to boot to the original initramfs this one time.
