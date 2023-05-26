@@ -17,6 +17,8 @@
 # -Renamed to tpm2-luks-autounlock.sh
 # -Now accepts the device as a command line parameter.  If none provided, pulls the first volume from /etc/crypttab and uses that.  Resolves issue #3
 # -Added check if running as root rather than using sudo (thanks zombiedk!).  Resolves issue #4
+# -Added variable to change the key size.  Defaults to 64 characters
+# -Added size parameter to tpm2_nvread calls to avoid warnings during unlock about reading the full index
 #
 # Updated 2022/04/29
 # -Automated comparison of root.key and TPM values
@@ -27,6 +29,8 @@
 # Created 2020/07/13
 # This assumes a fresh Ubuntu 20.04 install that was configured with full disk LUKS encryption at install so it requires a password to unlock the disk at boot.
 # This will create a new 64 character random password, add it to LUKS, store it in the TPM, and modify initramfs to pull it from the TPM automatically at boot.
+
+KEYSIZE=64
 
 # Check if running as root
 if (( $EUID != 0 )); then
@@ -59,15 +63,15 @@ echo
 apt install tpm2-tools
 
 echo
-echo Defining the area on the TPM where we will store a 64 character key...
+echo Defining the area on the TPM where we will store a ${KEYSIZE} character key...
 echo
 tpm2_nvundefine 0x1500016 2> /dev/null
-tpm2_nvdefine -s 64 0x1500016 > /dev/null
+tpm2_nvdefine -s ${KEYSIZE} 0x1500016 > /dev/null
 
 echo
-echo Generating a 64 char alphanumeric key and saving it to root.key...
+echo Generating a ${KEYSIZE} char alphanumeric key and saving it to root.key...
 echo
-cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 64 > root.key
+cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c ${KEYSIZE} > root.key
 
 echo
 echo Storing the key in the TPM...
@@ -77,7 +81,7 @@ tpm2_nvwrite -i root.key 0x1500016
 echo
 echo Checking the saved key against the one in the TPM...
 echo
-tpm2_nvread 0x1500016 2> /dev/null | diff root.key - > /dev/null
+tpm2_nvread -s ${KEYSIZE} 0x1500016 2> /dev/null | diff root.key - > /dev/null
 if [ $? != 0 ]
 then
    echo The root.key file does not match what is stored in the TPM.  Cannot proceed!
@@ -116,7 +120,7 @@ fi
 
 # No tmp, so it is the first time trying the script. Create a tmp file and try the TPM
 touch \${TMP_FILE}
-tpm2_nvread 0x1500016
+tpm2_nvread -s ${KEYSIZE} 0x1500016
 EOF
 
 # Move the file, set the ownership and permissions
@@ -180,7 +184,7 @@ echo If the drive unlocks as expected, you may optionally remove the original pa
 echo completely on the random new one stored in the TPM.  If you do this, you should keep a copy of the key somewhere saved on
 echo a DIFFERENT system, or printed and stored in a secure location on another system so you can manually enter it at the prompt.
 echo To get a copy of your key for backup purposes, run this command:
-echo echo \`sudo tpm2-getkey 2\> /dev/null\`
+echo echo \`tpm2_nvread -s ${KEYSIZE} 0x1500016\`
 echo
 echo If you remove the original password used to encrypt the drive and fail to backup the key in then TPM then experience TPM,
 echo motherboard, or another failure preventing auto-unlock, you WILL LOSE ACCESS TO EVERYTHING ON THE DRIVE!
