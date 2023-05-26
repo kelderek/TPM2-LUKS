@@ -4,9 +4,19 @@
 # Heavily modified, but based on:
 # https://run.tournament.org.il/ubuntu-18-04-and-tpm2-encrypted-system-disk/
 #
+# Usage:
+# sudo ./tpm2-luks-autounlock.sh [<device path>]
+#
+# e.g. to use the first device from /etc/crypttab:
+# sudo ./tpm2-luks-autounlock.sh
+#
+# or to specify a device:
+# sudo ./tpm2-luks-autounlock.sh /dev/sda3
+#
 # Updated 2023/05/26
-# -Renamed to tpm2_luks_unlock.sh
-# -Now accepts the device as a command line parameter.  If none provided, pulls the first volume from /etc/crypttab and uses that
+# -Renamed to tpm2-luks-autounlock.sh
+# -Now accepts the device as a command line parameter.  If none provided, pulls the first volume from /etc/crypttab and uses that.  Resolves issue #3
+# -Added check if running as root rather than using sudo (thanks zombiedk!).  Resolves issue #4
 #
 # Updated 2022/04/29
 # -Automated comparison of root.key and TPM values
@@ -17,6 +27,13 @@
 # Created 2020/07/13
 # This assumes a fresh Ubuntu 20.04 install that was configured with full disk LUKS encryption at install so it requires a password to unlock the disk at boot.
 # This will create a new 64 character random password, add it to LUKS, store it in the TPM, and modify initramfs to pull it from the TPM automatically at boot.
+
+# Check if running as root
+if (( $EUID != 0 )); then
+    echo "This script must run with root privileges, e.g.:"
+    echo "sudo $0 $1" 
+    exit
+fi
 
 # If no parameter provided, get the first volume in crypttab and look up the device
 if [ "$1" != "" ]
@@ -32,20 +49,20 @@ then
     echo Using \"${TARGET_DEVICE}\", which appears to be a valid LUKS encrypted device...
 else
     echo Device \"${TARGET_DEVICE}\" does not appear to be a valid LUKS encrypted device.  Please specify a device on the command line, e.g.
-    echo sudo ./tpm2_luks_unlock.sh /dev/sda3
+    echo sudo ./tpm2-luks-autounlock.sh /dev/sda3
     exit
 fi
 
 echo
 echo Installing tpm2-tools...
 echo
-sudo apt install tpm2-tools
+apt install tpm2-tools
 
 echo
 echo Defining the area on the TPM where we will store a 64 character key...
 echo
-sudo tpm2_nvundefine 0x1500016 2> /dev/null
-sudo tpm2_nvdefine -s 64 0x1500016 > /dev/null
+tpm2_nvundefine 0x1500016 2> /dev/null
+tpm2_nvdefine -s 64 0x1500016 > /dev/null
 
 echo
 echo Generating a 64 char alphanumeric key and saving it to root.key...
@@ -55,12 +72,12 @@ cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 64 > root.key
 echo
 echo Storing the key in the TPM...
 echo
-sudo tpm2_nvwrite -i root.key 0x1500016
+tpm2_nvwrite -i root.key 0x1500016
 
 echo
 echo Checking the saved key against the one in the TPM...
 echo
-sudo tpm2_nvread 0x1500016 2> /dev/null | diff root.key - > /dev/null
+tpm2_nvread 0x1500016 2> /dev/null | diff root.key - > /dev/null
 if [ $? != 0 ]
 then
    echo The root.key file does not match what is stored in the TPM.  Cannot proceed!
@@ -70,7 +87,7 @@ fi
 echo
 echo Adding the new key to LUKS.  You will need to enter the current passphrase used to unlock the drive...
 echo
-sudo cryptsetup luksAddKey ${TARGET_DEVICE} root.key
+cryptsetup luksAddKey ${TARGET_DEVICE} root.key
 if [ $? != 0 ]
 then
     echo Something went wrong adding the encryption key to ${TARGET_DEVICE}. Check /etc/crypttab and/or lsblk to determine your encrypted volume, then update this script with the correct value
@@ -103,9 +120,9 @@ tpm2_nvread 0x1500016
 EOF
 
 # Move the file, set the ownership and permissions
-sudo mv /tmp/tpm2-getkey /usr/local/sbin/tpm2-getkey
-sudo chown root: /usr/local/sbin/tpm2-getkey
-sudo chmod 750 /usr/local/sbin/tpm2-getkey
+mv /tmp/tpm2-getkey /usr/local/sbin/tpm2-getkey
+chown root: /usr/local/sbin/tpm2-getkey
+chmod 750 /usr/local/sbin/tpm2-getkey
 
 echo
 echo Creating initramfs hook and putting it at /etc/initramfs-tools/hooks/tpm2-decryptkey...
@@ -131,9 +148,9 @@ exit 0
 EOF
 
 # Move the file, set the ownership and permissions
-sudo mv /tmp/tpm2-decryptkey /etc/initramfs-tools/hooks/tpm2-decryptkey
-sudo chown root: /etc/initramfs-tools/hooks/tpm2-decryptkey
-sudo chmod 755 /etc/initramfs-tools/hooks/tpm2-decryptkey
+mv /tmp/tpm2-decryptkey /etc/initramfs-tools/hooks/tpm2-decryptkey
+chown root: /etc/initramfs-tools/hooks/tpm2-decryptkey
+chmod 755 /etc/initramfs-tools/hooks/tpm2-decryptkey
 
 echo
 echo Backing up /etc/crypttab to /etc/crypttab.bak, then updating it to run tpm2-getkey on decrypt...
@@ -145,14 +162,14 @@ then
 fi
 # e.g. this line: sda3_crypt UUID=d4a5a9a4-a2da-4c2e-a24c-1c1f764a66d2 none luks,discard
 # should become : sda3_crypt UUID=d4a5a9a4-a2da-4c2e-a24c-1c1f764a66d2 none luks,discard,keyscript=/usr/local/sbin/tpm2-getkey
-sudo cp /etc/crypttab /etc/crypttab.bak
-sudo sed -i 's%$%,keyscript=/usr/local/sbin/tpm2-getkey%' /etc/crypttab
+cp /etc/crypttab /etc/crypttab.bak
+sed -i 's%$%,keyscript=/usr/local/sbin/tpm2-getkey%' /etc/crypttab
 
 echo
 echo Copying the current initramfs just in case, then updating the initramfs with auto unlocking from the TPM...
 echo
-sudo cp /boot/initrd.img-`uname -r` /boot/initrd.img-`uname -r`.orig
-sudo mkinitramfs -o /boot/initrd.img-`uname -r` `uname -r`
+cp /boot/initrd.img-`uname -r` /boot/initrd.img-`uname -r`.orig
+mkinitramfs -o /boot/initrd.img-`uname -r` `uname -r`
 
 echo
 echo
