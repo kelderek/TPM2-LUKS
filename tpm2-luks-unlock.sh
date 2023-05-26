@@ -45,6 +45,11 @@ then
     TARGET_DEVICE=$1
 else
     CRYPTTAB_VOLUME=$(head --lines=1 /etc/crypttab | awk '{print $1}')
+    if [ "${CRYPTTAB_VOLUME}" == "" ]
+    then
+        echo "No device specified at the command line, and couldn't find one on the first line of /etc/crypttab.  Exiting with no changes made to the system."
+        exit
+    fi
     TARGET_DEVICE=$(cryptsetup status ${CRYPTTAB_VOLUME} | sed -n -E 's/device:\s+(.*)/\1/p')
 fi
 
