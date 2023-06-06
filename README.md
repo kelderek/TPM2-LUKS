@@ -2,33 +2,46 @@
 This script uses the TPM2 to store a LUKS key and automatically unlocks an encrypted system partition at boot.  After unlocking the system partition, initrd hands off decryption of the remaining volumes to systemd, which doesn't currently support keyscripts.  That means this script won't work for secondary drives, only the system partition.
 ### Use at your own risk, I make no guarantees and take no responsibility for any damage or loss of data you may suffer as a result of running the script!
 
-Based on:<br>
-https://run.tournament.org.il/ubuntu-18-04-and-tpm2-encrypted-system-disk/<br>
-and<br>
-https://run.tournament.org.il/ubuntu-20-04-and-tpm2-encrypted-system-disk/<br>
+Based on:
+https://run.tournament.org.il/ubuntu-18-04-and-tpm2-encrypted-system-disk/
+and
+https://run.tournament.org.il/ubuntu-20-04-and-tpm2-encrypted-system-disk/
 Thanks etzion!
 
 The script has been tested on Ubuntu 20.04 and 22.04 with full disk encryption on LVM.  Your drive must already be encrypted, this script will not do it for you!  If you selected ZFS and encryption during the Ubuntu 22.04 install, it will use ZFS native encryption and not LUKS, so this script will not work.
 
 It will create a new 64 character alpha-numeric random password, store it in the TPM, add it to LUKS, and modify initramfs to pull it from the TPM automatically at boot.  The new key is in addition to the any already used for unlocking the drive.  If the TPM unlocks fails at boot, it will revert to asking you for a passphrase.  You can use either the original one you used to encrypt the drive, or the one that this script added the TPM, if you have a record of it.
 
-# Usage
-Download tpm2-luks-unlock.sh, mark it as executable (e.g. chmod +x tpm2-luks-unlock.sh), and run it with sudo or as root e.g.
+# Install
+Download tpm2-luks-unlock.sh, mark it as executable
+```
+sudo wget -P /usr/local/sbin/ https://github.com/kelderek/TPM2-LUKS/blob/main/tpm2-luks-unlock.sh
+sudo chmod +x /usr/local/sbin/tpm2-luks-unlock.sh
+```
 
+# Usage
+Run it with sudo or as root e.g.
+```
 sudo ./tpm2-luks-unlock.sh [ \<device path\> ]
-  
+```
+
 Examples:
+
+This will run the script against the first volume listed in /etc/crypttab, which is usually sufficient for booting
+```
 sudo ./tpm2-luks-unlock.sh
-  This will run the script against the first volume listed in /etc/crypttab, which is usually sufficient for booting
-  
+```
+
+This will run the script against /dev/sda3
+```
 sudo ./tpm2-luks-unlock.sh /dev/sda3
-  This will run the script against /dev/sda3
+```
 
 If desired, you can modify the KEYSIZE variable near the top of the size to change the size of the key stored in the TPM.
 
 If the drive unlocks as expected after using the script, you can optionally remove the original password used to encrypt the drive and rely completely on the random new one stored in the TPM.  If you do this, you should keep a copy of the key somewhere saved on a DIFFERENT system, or printed and stored in a secure location on another system so you can manually enter it at the prompt if something goes wrong. To get a copy of your key for backup purposes, run this command:
 ```
-echo `sudo tpm2_nvread 0x1500016 2\> /dev/null`
+sudo tpm2_nvread -s 64 0x1500016
 ```
 
 ### If you remove the original password used to encrypt the drive and haven't backed up the key in the TPM, then a failure of the TPM, motherboard, or anything else prevents automatic unlocking, YOU WILL LOSE ACCESS TO EVERYTHING ON THE DRIVE!
