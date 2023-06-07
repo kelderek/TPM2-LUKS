@@ -43,6 +43,23 @@ CheckIfRoot () {
 	fi
 }
 
+ArgumentHandeling () {
+	# If no parameter provided, get the first volume in crypttab and look up the device
+	if [ $# -eq 1 ]
+	then
+		TARGET_DEVICE=$1
+	else
+		CRYPTTAB_VOLUME=$(head --lines=1 /etc/crypttab | awk '{print $1}')
+		if [ -z "$CRYPTTAB_VOLUME" ]
+		then
+			echo "No device specified at the command line, and couldn't find one on the first line of /etc/crypttab.  Exiting with no changes made to the system."
+			exit 1
+		fi
+		TARGET_DEVICE=$(cryptsetup status $CRYPTTAB_VOLUME | sed -n -E 's/device:\s+(.*)/\1/p')
+	fi
+	DEVICE=$(echo "$TARGET_DEVICE" | rev | awk -v FS='/' '{print $1}' | rev)
+}
+
 CheckDependencies () {
 	if ! command -v cryptsetup &> /dev/null
 	then
@@ -276,20 +293,8 @@ InfoMsg () {
 # Fail if not run as ROOT
 CheckIfRoot
 
-# If no parameter provided, get the first volume in crypttab and look up the device
-if [ $# -eq 1 ]
-then
-	TARGET_DEVICE=$1
-else
-	CRYPTTAB_VOLUME=$(head --lines=1 /etc/crypttab | awk '{print $1}')
-	if [ -z "$CRYPTTAB_VOLUME" ]
-	then
-		echo "No device specified at the command line, and couldn't find one on the first line of /etc/crypttab.  Exiting with no changes made to the system."
-		exit 1
-	fi
-	TARGET_DEVICE=$(cryptsetup status $CRYPTTAB_VOLUME | sed -n -E 's/device:\s+(.*)/\1/p')
-fi
-DEVICE=$(echo "$TARGET_DEVICE" | rev | awk -v FS='/' '{print $1}' | rev)
+# Check witch arguments the script is called with
+ArgumentHandeling $@
 
 # Check that the required apps are installed
 CheckDependencies
