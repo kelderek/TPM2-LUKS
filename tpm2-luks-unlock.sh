@@ -50,6 +50,48 @@ unset CRYPTTAB_DEVICE_NAMES
 unset CRYPTTAB_DEVICE_PATHS
 unset CRYPTTAB_DEVICE_SELECTED
 
+if ! dpkg -s tpm2-tools 1> /dev/null 2> /dev/null
+then
+   echo
+   echo "tpm2-tools not detected, installing..."
+   apt install tpm2-tools -y
+fi
+
+# Attempt to read from the TPM2 to see if something is already there
+KEY=$(tpm2_nvread 0x1500016 2> /dev/null)
+if [ "$KEY" != "" ]
+then # found something is already there
+   echo
+   echo "Looks like there is already a key stored in the TPM2 device."
+   echo "Using the existing key will ensure any other devices depending on it will still"
+   echo "automatically unlock at boot."
+   echo
+   echo "If you choose NOT to use the existing key, a new key will be generated which will"
+   echo "overwrite the existing key so any devices using the old key will need to be"
+   echo "manually unlocked at boot if don't select time select them this time.  The existing"
+   echo "key will NOT be removed from any devices using it and can still be used manually."
+   while true
+   do
+      read -p "Do you want to use the existing key? (YES/no) " PROMPT
+      if [ "${PROMPT,,}" == "yes" ] || [ "${PROMPT,,}" == "y" ] || [ "${PROMPT,,}" == "" ]
+      then
+         echo
+         echo "Ok, reusing the key..."
+
+         # Store the key in /root/tpm2.key
+         echo -n $KEY > /root/tpm2.key
+         KEYSIZE=${#KEY}
+
+         break
+      elif [ "${PROMPT,,}" == "no" ] || [ "${PROMPT,,}" == "n" ]
+      then
+         KEY=""
+         break
+      fi
+      echo "Sorry, I didn't understand that. Please type yes or no"
+   done
+fi
+
 #Add encrypted drives listed in /etc/crypttab to an array, quit if none found
 #grep explanation:
 # -o returns only matching portion
@@ -138,43 +180,6 @@ then
    echo
    echo "No drives were selected.  Cancelling, no changes have been made to the system."
    exit
-fi
-
-echo
-echo "Installing tpm2-tools..."
-apt install tpm2-tools -y
-
-# Attempt to read from the TPM2 to see if something is already there
-KEY=$(tpm2_nvread 0x1500016 2> /dev/null)
-if [ "$KEY" != "" ]
-then # found something is already there
-   echo
-   echo "Looks like there is already a key stored in the TPM2 device."
-   echo "Using the existing key will ensure any other devices depending on it will still"
-   echo "automatically unlock at boot.  If you choose not to use the existing key, a new"
-   echo "key will be generated and any devices using the old key will need to be manually"
-   echo "unlocked at boot if you didn't select them this time.  The existing key"
-   echo "will NOT be removed from any devices using it and can still be used manually."
-   while true
-   do
-      read -p "Do you want to use the existing key? (YES/no) " PROMPT
-      if [ "${PROMPT,,}" == "yes" ] || [ "${PROMPT,,}" == "y" ] || [ "${PROMPT,,}" == "" ]
-      then
-         echo
-         echo "Ok, reusing the key..."
-
-         # Store the key in /root/tpm2.key
-         echo -n $KEY > /root/tpm2.key
-         KEYSIZE=${#KEY}
-
-         break
-      elif [ "${PROMPT,,}" == "no" ] || [ "${PROMPT,,}" == "n" ]
-      then
-         KEY=""
-         break
-      fi
-      echo "Sorry, I didn't understand that. Please type yes or no"
-   done
 fi
 
 if [ "$KEY" == "" ] # No key was found in TPM2 or user wants a new key made
@@ -266,9 +271,11 @@ then
 
    # No tmp, so it is the first time trying the script. Create a tmp file and try the TPM
    touch \${TMP_FILE}
+   tpm2_nvread -s ${KEYSIZE} 0x1500016
+else
+   echo $(tpm2_nvread -s ${KEYSIZE} 0x1500016)
 fi
 
-tpm2_nvread -s ${KEYSIZE} 0x1500016
 EOF
 
 # Set the file ownership and permissions
