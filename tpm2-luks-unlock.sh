@@ -196,7 +196,9 @@ fi
 
 # Iterate over all selected devices, using the same key for them all
 echo
-echo "Adding the new key to LUKS for all selected devices.  You will need to unlock each to add the new key..."
+echo
+echo
+echo "Adding the new key to LUKS for all selected devices.  You will need to unlock each to add the new key."
 for I in "${!CRYPTTAB_DEVICE_NAMES[@]}"
 do
    if [ "${CRYPTTAB_DEVICE_SELECTED[$I]}" = "y" ]
@@ -265,7 +267,7 @@ chmod 750 /usr/local/sbin/tpm2-getkey
 
 echo
 echo "Creating initramfs hook and putting it at /etc/initramfs-tools/hooks/tpm2-decryptkey..."
-cat << EOF > /tmp/tpm2-decryptkey
+cat << EOF > /etc/initramfs-tools/hooks/tpm2-decryptkey
 #!/bin/sh
 PREREQ=""
 prereqs()
@@ -285,11 +287,12 @@ copy_exec /usr/lib/x86_64-linux-gnu/libtss2-tcti-device.so.0
 exit 0
 EOF
 
-# Move the file, set the ownership and permissions
-mv /tmp/tpm2-decryptkey /etc/initramfs-tools/hooks/tpm2-decryptkey
+# Set the file ownership and permissions
 chown root: /etc/initramfs-tools/hooks/tpm2-decryptkey
 chmod 755 /etc/initramfs-tools/hooks/tpm2-decryptkey
 
+echo
+echo
 echo
 echo "Backing up /etc/crypttab to /etc/crypttab.bak, then updating selected devices to unlock automatically..."
 cp /etc/crypttab /etc/crypttab.bak
@@ -300,10 +303,10 @@ do
    if [ "${CRYPTTAB_DEVICE_SELECTED[$I]}" = "y" ]
    then
       # Check to see if tpm2-getkey has already been added to the device manually or by a previous version
-      grep -q "^\s*${CRYPTTAB_DEVICE_NAMES[$I]}.*,initramfs,keyscript=/usr/local/sbin/tpm2-getkey" /etc/crypttab
+      grep -q "^\s*${CRYPTTAB_DEVICE_NAMES[$I]}.*tpm2-getkey" /etc/crypttab
       if [ $? != 0 ]
       then
-        # grep did not find the keyscript on the line for the device, add it
+        # grep did not find the keyscript on the line for the device, need to add it.
         # the initramfs parameter is also added so it will be unlocked before systemd
         # because systemd does not directly support keyscripts so secondary drives
         # won't unlock.  Eventually would be good to switch to using an AF_UNIX socket
@@ -321,19 +324,17 @@ do
       fi
    fi
 done # for I loop
-   
-# e.g. this line: sda3_crypt UUID=d4a5a9a4-a2da-4c2e-a24c-1c1f764a66d2 none luks,discard
-# should become : sda3_crypt UUID=d4a5a9a4-a2da-4c2e-a24c-1c1f764a66d2 none luks,discard,initramfs,keyscript=/usr/local/sbin/tpm2-getkey
 
-echo
-if [ -f "/boot/initrd.img-$(uname -r).orig" ]
+# e.g. this line: sda3_crypt UUID=d4a5a9a4-a2da-4c2e-a24c-1c1f764a66d2 none luks
+# should become : sda3_crypt UUID=d4a5a9a4-a2da-4c2e-a24c-1c1f764a66d2 none luks,initramfs,keyscript=/usr/local/sbin/tpm2-getkey
+
+if ! [ -f "/boot/initrd.img-$(uname -r).orig" ]
 then
-   echo "Backup of initramfs already exists at /boot/initrd.img-$(uname -r).orig, skipping backup."
-else
-   echo "Backup up initramfs to /boot/initrd.img-$(uname -r).orig..."
+   # Backup up initramfs to /boot/initrd.img-$(uname -r).orig
    cp /boot/initrd.img-$(uname -r) /boot/initrd.img-$(uname -r).orig
 fi
-echo "Updating initramfs to support automatic unlocking from the TPM2..."
+
+#Update initramfs to support automatic unlocking from the TPM2
 mkinitramfs -o /boot/initrd.img-$(uname -r) $(uname -r)
 
 echo
