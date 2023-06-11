@@ -87,7 +87,7 @@ do
    echo "Select devices you would like to add automatic unlocking to.  NOTE: Not selecting or unselecting a device does not disable or remove automatic unlocking if it is already setup:"
    for I in "${!CRYPTTAB_DEVICE_NAMES[@]}"
    do
-      echo "Index: $I   Selected: ${CRYPTTAB_DEVICE_SELECTED[$I]}   Name: ${CRYPTTAB_DEVICE_NAMES[$I]}   Path: ${CRYPTTAB_DEVICE_PATHS[$I]} $(grep -q "^\s*${CRYPTTAB_DEVICE_NAMES[$I]}.*,keyscript=/usr/local/sbin/tpm2-getkey" /etc/crypttab && echo " (already setup to automatically unlock at boot)")"
+      echo "Index: $I   Selected: ${CRYPTTAB_DEVICE_SELECTED[$I]}   Name: ${CRYPTTAB_DEVICE_NAMES[$I]}   Path: ${CRYPTTAB_DEVICE_PATHS[$I]} $(grep -q "^\s*${CRYPTTAB_DEVICE_NAMES[$I]}.*,initramfs,keyscript=/usr/local/sbin/tpm2-getkey" /etc/crypttab && echo " (already setup to automatically unlock at boot)")"
    done  #for I loop
    echo
    echo "Enter the index numbers of devices separated by spaces to select/unselect them, 'a' to select all devices, 'n' to unselect all devices, or 'd' when done selecting:"
@@ -300,10 +300,15 @@ do
    if [ "${CRYPTTAB_DEVICE_SELECTED[$I]}" = "y" ]
    then
       # Check to see if tpm2-getkey has already been added to the device manually or by a previous version
-      grep -q "^\s*${CRYPTTAB_DEVICE_NAMES[$I]}.*,keyscript=/usr/local/sbin/tpm2-getkey" /etc/crypttab
+      grep -q "^\s*${CRYPTTAB_DEVICE_NAMES[$I]}.*,initramfs,keyscript=/usr/local/sbin/tpm2-getkey" /etc/crypttab
       if [ $? != 0 ]
       then
-        # grep did not find /tpm2-getkey on the line for the device, add it
+        # grep did not find the keyscript on the line for the device, add it
+        # the initramfs parameter is also added so it will be unlocked before systemd
+        # because systemd does not directly support keyscripts so secondary drives
+        # won't unlock.  Eventually would be good to switch to using an AF_UNIX socket
+        # backed by a systemd service that calls the keyscript.  Jumping off point here:
+        # https://github.com/systemd/systemd/pull/3007
 		# sed explanation:
 		# using " instead of ' because of the variable, using % as the sed delimiter to avoid needing to
 		# escape / characters.  The ( and ) characters are escaped so I can reference the contents on the
@@ -312,13 +317,13 @@ do
 		# just the whole line, plus a comma and the keyscript parameter.  Note this stops after the first
 		# match, but that should be fine.  It won't match commented lines, and there should never be duplicate
 		# devices listed in /etc/crypttab
-        sed -i "s%\(^\s*${CRYPTTAB_DEVICE_NAMES[$I]}.*\)$%\1,keyscript=/usr/local/sbin/tpm2-getkey%" /etc/crypttab
+        sed -i "s%\(^\s*${CRYPTTAB_DEVICE_NAMES[$I]}.*\)$%\1,initramfs,keyscript=/usr/local/sbin/tpm2-getkey%" /etc/crypttab
       fi
    fi
 done # for I loop
    
 # e.g. this line: sda3_crypt UUID=d4a5a9a4-a2da-4c2e-a24c-1c1f764a66d2 none luks,discard
-# should become : sda3_crypt UUID=d4a5a9a4-a2da-4c2e-a24c-1c1f764a66d2 none luks,discard,keyscript=/usr/local/sbin/tpm2-getkey
+# should become : sda3_crypt UUID=d4a5a9a4-a2da-4c2e-a24c-1c1f764a66d2 none luks,discard,initramfs,keyscript=/usr/local/sbin/tpm2-getkey
 
 echo
 if [ -f "/boot/initrd.img-$(uname -r).orig" ]
