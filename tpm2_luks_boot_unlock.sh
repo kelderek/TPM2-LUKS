@@ -16,10 +16,15 @@
 #
 # Version: 0.8.0
 
+# Check if running as root
+if (( $EUID != 0 )); then
+    echo "This script must run with root privileges, e.g.:"
+    echo "sudo $0 $1" 
+    exit
+fi
+
 #Get user confirmation
 echo "This script will generate a random alpha-numeric key, store it in your TPM2 device, then add it as a LUKS key to an encrypted drive.  It will then create scripts necessary for unlocking the drive automatically at boot by reading the key from the TPM2 device, and update initramfs to include the scripts."
-echo
-echo "*** sudo rights are required! ***"
 echo
 while true
 do
@@ -63,8 +68,8 @@ do
    # s to search, '/' are search parameter delimeters.  Look for "device:" followed by at least
    # one whitespace character, then get the rest of the line.  Replace the whole match with what
    # was in parentheses (the device path in this case).  Final "p" parameter tells it to print that line
-   TEMP_DEVICE_PATH=$(sudo cryptsetup status ${TEMP_DEVICE_NAMES[$I]} | sed -n -E 's/device:\s+(.*)/\1/p')
-   if [ "$TEMP_DEVICE_PATH" != "" ] && $(sudo cryptsetup isLuks $TEMP_DEVICE_PATH 2> /dev/null)
+   TEMP_DEVICE_PATH=$(cryptsetup status ${TEMP_DEVICE_NAMES[$I]} | sed -n -E 's/device:\s+(.*)/\1/p')
+   if [ "$TEMP_DEVICE_PATH" != "" ] && $(cryptsetup isLuks $TEMP_DEVICE_PATH 2> /dev/null)
    then
       #Device has a name, a path, and is a valid LUKS device
       CRYPTTAB_DEVICE_NAMES+=( ${TEMP_DEVICE_NAMES[$I]} )
@@ -130,10 +135,10 @@ fi
 
 echo
 echo "Installing tpm2-tools..."
-sudo apt install tpm2-tools -y
+apt install tpm2-tools -y
 
 # Attempt to read from the TPM2 to see if something is already there
-sudo tpm2_nvread 0x1500016 1> /dev/null 2> /dev/null
+tpm2_nvread 0x1500016 1> /dev/null 2> /dev/null
 if [ $? = 0 ]
 then # tpm2_nvread succeded, so something is already there
    echo
@@ -147,20 +152,20 @@ then # tpm2_nvread succeded, so something is already there
          echo
          echo "Ok, reusing the key already in the TPM2 device and saving it to root.key..."
          # Pull the key from the TPM2 device and save it to root.key
-         sudo tpm2_nvread 0x1500016 > root.key
+         tpm2_nvread 0x1500016 > root.key
          break
       elif [ "${PROMPT,,}" == "no" ] || [ "${PROMPT,,}" == "n" ]
       then
          echo
          echo "Ok, creating a new key and storing it at root.key and in the TPM2 device..."
          # Clear out the area on the TPM2 just to be safe
-         sudo tpm2_nvundefine 0x1500016 2> /dev/null
+         tpm2_nvundefine 0x1500016 2> /dev/null
          # Define the area for the key on the TPM2
-         sudo tpm2_nvdefine -s 64 0x1500016 > /dev/null
+         tpm2_nvdefine -s 64 0x1500016 > /dev/null
          # Generate a 64 char alphanumeric key and save it to root.key
          cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 64 > root.key
          # Store the key in the TPM
-         sudo tpm2_nvwrite -i root.key 0x1500016
+         tpm2_nvwrite -i root.key 0x1500016
          break
       fi
       echo "Sorry, I didn't understand that. Please type yes or no"
@@ -169,18 +174,18 @@ else # tpm2_nvread failed, should be safe to generate a new key and store it in 
    echo
    echo "Creating a new key and storing it at root.key and in the TPM2 device..."
    # Clear out the area on the TPM2 just to be safe
-   sudo tpm2_nvundefine 0x1500016 2> /dev/null
+   tpm2_nvundefine 0x1500016 2> /dev/null
    # Define the area for the key on the TPM2
-   sudo tpm2_nvdefine -s 64 0x1500016 > /dev/null
+   tpm2_nvdefine -s 64 0x1500016 > /dev/null
    # Generate a 64 char alphanumeric key and save it to root.key
    cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 64 > root.key
    # Store the key in the TPM
-   sudo tpm2_nvwrite -i root.key 0x1500016
+   tpm2_nvwrite -i root.key 0x1500016
 fi
 
 echo
 echo "Making sure root.key and the TPM2 device match..."
-sudo tpm2_nvread 0x1500016 2> /dev/null | diff root.key - > /dev/null
+tpm2_nvread 0x1500016 2> /dev/null | diff root.key - > /dev/null
 if [ $? != 0 ]
 then
    echo "The root.key file does not match what is stored in the TPM.  Cannot proceed!"
@@ -196,7 +201,7 @@ do
    then
       echo
       echo "Adding key to ${CRYPTTAB_DEVICE_NAMES[$I]} (${CRYPTTAB_DEVICE_PATHS[$I]})..."
-      sudo cryptsetup luksAddKey ${CRYPTTAB_DEVICE_PATHS[$I]} root.key
+      cryptsetup luksAddKey ${CRYPTTAB_DEVICE_PATHS[$I]} root.key
       if [ $? != 0 ]
       then
          echo
@@ -208,7 +213,7 @@ do
             then
                echo
                echo "Adding key to ${CRYPTTAB_DEVICE_NAMES[$I]} (${CRYPTTAB_DEVICE_PATHS[$I]})..."
-               sudo cryptsetup luksAddKey ${CRYPTTAB_DEVICE_PATHS[$I]} root.key
+               cryptsetup luksAddKey ${CRYPTTAB_DEVICE_PATHS[$I]} root.key
                if [ $? != 0 ]
                then
                   echo
@@ -254,9 +259,9 @@ tpm2_nvread 0x1500016
 EOF
 
 # Move the file, set the ownership and permissions
-sudo mv /tmp/tpm2-getkey /usr/local/sbin/tpm2-getkey
-sudo chown root: /usr/local/sbin/tpm2-getkey
-sudo chmod 750 /usr/local/sbin/tpm2-getkey
+mv /tmp/tpm2-getkey /usr/local/sbin/tpm2-getkey
+chown root: /usr/local/sbin/tpm2-getkey
+chmod 750 /usr/local/sbin/tpm2-getkey
 
 echo
 echo "Creating initramfs hook and putting it at /etc/initramfs-tools/hooks/tpm2-decryptkey..."
@@ -281,13 +286,13 @@ exit 0
 EOF
 
 # Move the file, set the ownership and permissions
-sudo mv /tmp/tpm2-decryptkey /etc/initramfs-tools/hooks/tpm2-decryptkey
-sudo chown root: /etc/initramfs-tools/hooks/tpm2-decryptkey
-sudo chmod 755 /etc/initramfs-tools/hooks/tpm2-decryptkey
+mv /tmp/tpm2-decryptkey /etc/initramfs-tools/hooks/tpm2-decryptkey
+chown root: /etc/initramfs-tools/hooks/tpm2-decryptkey
+chmod 755 /etc/initramfs-tools/hooks/tpm2-decryptkey
 
 echo
 echo "Backing up /etc/crypttab to /etc/crypttab.bak, then updating selected devices to unlock automatically..."
-sudo cp /etc/crypttab /etc/crypttab.bak
+cp /etc/crypttab /etc/crypttab.bak
 # Iterate over all selected devices, adding keyscript as needed
 for I in "${!CRYPTTAB_DEVICE_NAMES[@]}"
 do
@@ -307,7 +312,7 @@ do
 		# just the whole line, plus a comma and the keyscript parameter.  Note this stops after the first
 		# match, but that should be fine.  It won't match commented lines, and there should never be duplicate
 		# devices listed in /etc/crypttab
-        sudo sed -i "s%\(^\s*${CRYPTTAB_DEVICE_NAMES[$I]}.*\)$%\1,keyscript=/usr/local/sbin/tpm2-getkey%" /etc/crypttab
+        sed -i "s%\(^\s*${CRYPTTAB_DEVICE_NAMES[$I]}.*\)$%\1,keyscript=/usr/local/sbin/tpm2-getkey%" /etc/crypttab
       fi
    fi
 done # for I loop
@@ -321,10 +326,10 @@ then
    echo "Backup of initramfs already exists at /boot/initrd.img-$(uname -r).orig, skipping backup."
 else
    echo "Backup up initramfs to /boot/initrd.img-$(uname -r).orig..."
-   sudo cp /boot/initrd.img-$(uname -r) /boot/initrd.img-$(uname -r).orig
+   cp /boot/initrd.img-$(uname -r) /boot/initrd.img-$(uname -r).orig
 fi
 echo "Updating initramfs to support automatic unlocking from the TPM2..."
-sudo mkinitramfs -o /boot/initrd.img-$(uname -r) $(uname -r)
+mkinitramfs -o /boot/initrd.img-$(uname -r) $(uname -r)
 
 echo
 echo
