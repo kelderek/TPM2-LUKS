@@ -14,7 +14,7 @@
 # comment here for further details:
 # https://run.tournament.org.il/ubuntu-20-04-and-tpm2-encrypted-system-disk/#comment-501794
 #
-# Version: 0.8.0
+# Version: 2.0.0
 
 KEYSIZE=64
 
@@ -49,6 +49,20 @@ done
 unset CRYPTTAB_DEVICE_NAMES
 unset CRYPTTAB_DEVICE_PATHS
 unset CRYPTTAB_DEVICE_SELECTED
+
+if ! dpkg -s cryptsetup-bin 1> /dev/null 2> /dev/null
+then
+   echo
+   echo "tpm2-tools not detected, installing..."
+   apt install cryptsetup-bin -y
+fi
+
+if ! dpkg -s initramfs-tools-core 1> /dev/null 2> /dev/null
+then
+   echo
+   echo "tpm2-tools not detected, installing..."
+   apt install initramfs-tools-core -y
+fi
 
 if ! dpkg -s tpm2-tools 1> /dev/null 2> /dev/null
 then
