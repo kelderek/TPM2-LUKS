@@ -340,8 +340,7 @@ mkinitramfs -o /boot/initrd.img-$(uname -r) $(uname -r)
 echo
 echo
 echo
-echo "At this point you are ready to reboot and try it out!"
-echo
+echo "Before you reboot and try it out, please note the following:"
 echo "If the drive unlocks as expected, you may optionally remove the original password used to encrypt the drive and rely completely on the random new one stored in the TPM2.  If you do this, you should keep a copy of the key somewhere outside this system. E.g. printed and kept locked somewhere safe. To get a copy of the key stored in the TPM2, run this command:"
 echo "sudo tpm2-getkey"
 echo
