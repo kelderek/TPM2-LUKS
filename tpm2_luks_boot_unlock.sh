@@ -16,15 +16,17 @@
 #
 # Version: 0.8.0
 
+KEYSIZE=64
+
 # Check if running as root
 if (( $EUID != 0 )); then
     echo "This script must run with root privileges, e.g.:"
-    echo "sudo $0 $1" 
+    echo "sudo $0 $1"
     exit
 fi
 
 #Get user confirmation
-echo "This script will generate a random alpha-numeric key, store it in your TPM2 device, then add it as a LUKS key to an encrypted drive.  It will then create scripts necessary for unlocking the drive automatically at boot by reading the key from the TPM2 device, and update initramfs to include the scripts."
+echo "This script will generate a random alphanumeric key, store it in your TPM2 device, then add it as a LUKS key to an encrypted drive.  It will then create scripts necessary for unlocking the drive automatically at boot by reading the key from the TPM2 device, and update initramfs to include the scripts."
 echo
 while true
 do
@@ -80,14 +82,14 @@ done
 
 #Ask user which target they want to run the script against
 SELECTIONS_COMPLETE="no"
-while [ "$SELECTIONS_COMPLETE" = "no" ]
+while [ "$SELECTIONS_COMPLETE" == "no" ]
 do
    echo
    echo
-   echo "Select devices you would like to add automatic unlocking to.  NOTE: Not selecting or unselecting a device does not disable or remove automatic unlocking if it is already setup:"
+   echo "Devices found in crypttab:"
    for I in "${!CRYPTTAB_DEVICE_NAMES[@]}"
    do
-      echo "Index: $I   Selected: ${CRYPTTAB_DEVICE_SELECTED[$I]}   Name: ${CRYPTTAB_DEVICE_NAMES[$I]}   Path: ${CRYPTTAB_DEVICE_PATHS[$I]} $(grep -q "^\s*${CRYPTTAB_DEVICE_NAMES[$I]}.*,initramfs,keyscript=/usr/local/sbin/tpm2-getkey" /etc/crypttab && echo " (already setup to automatically unlock at boot)")"
+      echo "Index: $I   Selected: ${CRYPTTAB_DEVICE_SELECTED[$I]}   Name: ${CRYPTTAB_DEVICE_NAMES[$I]}   Path: ${CRYPTTAB_DEVICE_PATHS[$I]} $(grep -q "^\s*${CRYPTTAB_DEVICE_NAMES[$I]}.*tpm2-getkey" /etc/crypttab && echo " (already setup to automatically unlock at boot)")"
    done  #for I loop
    echo
    echo "Enter the index numbers of devices separated by spaces to select/unselect them, 'a' to select all devices, 'n' to unselect all devices, or 'd' when done selecting:"
@@ -138,58 +140,58 @@ echo "Installing tpm2-tools..."
 apt install tpm2-tools -y
 
 # Attempt to read from the TPM2 to see if something is already there
-tpm2_nvread 0x1500016 1> /dev/null 2> /dev/null
-if [ $? = 0 ]
-then # tpm2_nvread succeded, so something is already there
+KEY=$(tpm2_nvread 0x1500016 2> /dev/null)
+if [ "$KEY" != "" ]
+then # found something is already there
    echo
    echo "Looks like there is already a key stored in the TPM2 device.  Using the existing key will ensure any other devices depending on it will still automatically unlock at boot."
-   echo "If you choose not to use the existing key, a new key will be generated and any devices using the old key will need to be manually unlocked at boot."
+   echo "If you choose not to use the existing key, a new key will be generated and any devices using the old key will need to be manually unlocked at boot if you didn't select them this time.  The existing key will NOT be removed from any devices using it and can still be used manually."
    while true
    do
       read -p "Do you want to use the existing key? (YES/no) " PROMPT
       if [ "${PROMPT,,}" == "yes" ] || [ "${PROMPT,,}" == "y" ] || [ "${PROMPT,,}" == "" ]
       then
          echo
-         echo "Ok, reusing the key already in the TPM2 device and saving it to root.key..."
-         # Pull the key from the TPM2 device and save it to root.key
-         tpm2_nvread 0x1500016 > root.key
+         echo "Ok, reusing the key..."
+
+         # Store the key in /root/tpm2.key
+         echo -n $KEY > /root/tpm2.key
+         KEYSIZE=${#KEY}
+
          break
       elif [ "${PROMPT,,}" == "no" ] || [ "${PROMPT,,}" == "n" ]
       then
-         echo
-         echo "Ok, creating a new key and storing it at root.key and in the TPM2 device..."
-         # Clear out the area on the TPM2 just to be safe
-         tpm2_nvundefine 0x1500016 2> /dev/null
-         # Define the area for the key on the TPM2
-         tpm2_nvdefine -s 64 0x1500016 > /dev/null
-         # Generate a 64 char alphanumeric key and save it to root.key
-         cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 64 > root.key
-         # Store the key in the TPM
-         tpm2_nvwrite -i root.key 0x1500016
+         KEY=""
          break
       fi
       echo "Sorry, I didn't understand that. Please type yes or no"
    done
-else # tpm2_nvread failed, should be safe to generate a new key and store it in the TPM2 device
-   echo
-   echo "Creating a new key and storing it at root.key and in the TPM2 device..."
-   # Clear out the area on the TPM2 just to be safe
-   tpm2_nvundefine 0x1500016 2> /dev/null
-   # Define the area for the key on the TPM2
-   tpm2_nvdefine -s 64 0x1500016 > /dev/null
-   # Generate a 64 char alphanumeric key and save it to root.key
-   cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 64 > root.key
-   # Store the key in the TPM
-   tpm2_nvwrite -i root.key 0x1500016
 fi
 
-echo
-echo "Making sure root.key and the TPM2 device match..."
-tpm2_nvread 0x1500016 2> /dev/null | diff root.key - > /dev/null
-if [ $? != 0 ]
+if [ "$KEY" == "" ] # No key was found in TPM2 or user wants a new key made
 then
-   echo "The root.key file does not match what is stored in the TPM.  Cannot proceed!"
-   exit
+   # Generate a $KEYSIZE long char alphanumeric key and save it to /root/tpm2.key
+   KEY=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c $KEYSIZE)
+
+   # Store the key in /root/tpm2.key
+   echo -n $KEY > /root/tpm2.key
+
+   # Clear out the area on the TPM2 just to be safe
+   tpm2_nvundefine 0x1500016 2> /dev/null
+
+   # Define the area for the key on the TPM2
+   tpm2_nvdefine -s $KEYSIZE 0x1500016 > /dev/null
+
+   # Store the key in the TPM
+   tpm2_nvwrite -i /root/tpm2.key 0x1500016
+
+   # Make sure /root/tpm2.key and the TPM2 device match
+   tpm2_nvread -s $KEYSIZE 0x1500016 2> /dev/null | diff /root/tpm2.key - > /dev/null
+   if [ $? != 0 ]
+   then
+      echo "Could not verify the key is stored properly in the TPM2 device.  Cannot proceed!"
+      exit
+   fi
 fi
 
 # Iterate over all selected devices, using the same key for them all
@@ -201,7 +203,7 @@ do
    then
       echo
       echo "Adding key to ${CRYPTTAB_DEVICE_NAMES[$I]} (${CRYPTTAB_DEVICE_PATHS[$I]})..."
-      cryptsetup luksAddKey ${CRYPTTAB_DEVICE_PATHS[$I]} root.key
+      cryptsetup luksAddKey ${CRYPTTAB_DEVICE_PATHS[$I]} /root/tpm2.key
       if [ $? != 0 ]
       then
          echo
@@ -213,7 +215,7 @@ do
             then
                echo
                echo "Adding key to ${CRYPTTAB_DEVICE_NAMES[$I]} (${CRYPTTAB_DEVICE_PATHS[$I]})..."
-               cryptsetup luksAddKey ${CRYPTTAB_DEVICE_PATHS[$I]} root.key
+               cryptsetup luksAddKey ${CRYPTTAB_DEVICE_PATHS[$I]} /root/tpm2.key
                if [ $? != 0 ]
                then
                   echo
@@ -236,8 +238,8 @@ do
 done
 
 echo
-echo "Removing root.key file for extra security..."
-rm root.key
+echo "Removing /root/tpm2.key file for extra security..."
+rm /root/tpm2.key
 
 echo
 echo "Creating a key recovery script and putting it at /usr/local/sbin/tpm2-getkey..."
