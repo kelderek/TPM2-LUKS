@@ -216,52 +216,50 @@ do
                echo
                echo "Adding key to ${CRYPTTAB_DEVICE_NAMES[$I]} (${CRYPTTAB_DEVICE_PATHS[$I]})..."
                cryptsetup luksAddKey ${CRYPTTAB_DEVICE_PATHS[$I]} /root/tpm2.key
-               if [ $? != 0 ]
+               if [ $? == 0 ]
                then
-                  echo
-                  echo "Couldn't add the new key to ${CRYPTTAB_DEVICE_NAMES[$I]} (${CRYPTTAB_DEVICE_PATHS[$I]}), quitting."
-                  echo "No changes have been made to the boot environment."
-                  exit
+                  break # while loop
                fi
-               break
             elif [ "${PROMPT,,}" == "no" ] || [ "${PROMPT,,}" == "n" ]
             then
                echo
                echo "Couldn't add the new key to ${CRYPTTAB_DEVICE_NAMES[$I]} (${CRYPTTAB_DEVICE_PATHS[$I]}), quitting."
                echo "No changes have been made to the boot environment."
                exit
+            else
+               echo "Sorry, I didn't understand that. Please type yes or no"
             fi
-            echo "Sorry, I didn't understand that. Please type yes or no"
-         done
+         done # while loop
       fi
    fi
-done
+done # for loop
 
-echo
-echo "Removing /root/tpm2.key file for extra security..."
+# Removing /root/tpm2.key file for extra security
 rm /root/tpm2.key
 
-echo
-echo "Creating a key recovery script and putting it at /usr/local/sbin/tpm2-getkey..."
-cat << EOF > /tmp/tpm2-getkey
+# Creating a key recovery script and putting it at /usr/local/sbin/tpm2-getkey...
+cat << EOF > /usr/local/sbin/tpm2-getkey
 #!/bin/sh
-TMP_FILE=".tpm2-getkey.\${CRYPTTAB_NAME}.tmp"
-
-if [ -f "\${TMP_FILE}" ]
+if [ "\${CRYPTTAB_NAME}" != "" ]
 then
-  # tmp file exists, meaning we tried the TPM this boot, but it didn’t work for the drive and this must be the second
-  # or later pass for the drive. Either the TPM is failed/missing, or has the wrong key stored in it.
-  /lib/cryptsetup/askpass "Automatic disk unlock via TPM failed for (\${CRYPTTAB_SOURCE}) Enter passphrase: "
-  exit
+   TMP_FILE=".tpm2-getkey.\${CRYPTTAB_NAME}.tmp"
+
+   if [ -f "\${TMP_FILE}" ]
+   then
+      # tmp file exists, meaning we tried the TPM2 this boot, but it didn’t work for the drive and this must be the second
+      # or later try to unlock the drive. Either the TPM2 is failed/missing, or has the wrong key stored in it.
+      /lib/cryptsetup/askpass "Automatic disk unlock via TPM failed for (\${CRYPTTAB_SOURCE}) Enter passphrase: "
+      exit
+   fi
+
+   # No tmp, so it is the first time trying the script. Create a tmp file and try the TPM
+   touch \${TMP_FILE}
 fi
 
-# No tmp, so it is the first time trying the script. Create a tmp file and try the TPM
-touch \${TMP_FILE}
-tpm2_nvread 0x1500016
+tpm2_nvread -s ${KEYSIZE} 0x1500016
 EOF
 
-# Move the file, set the ownership and permissions
-mv /tmp/tpm2-getkey /usr/local/sbin/tpm2-getkey
+# Set the file ownership and permissions
 chown root: /usr/local/sbin/tpm2-getkey
 chmod 750 /usr/local/sbin/tpm2-getkey
 
@@ -344,7 +342,7 @@ echo
 echo "At this point you are ready to reboot and try it out!"
 echo
 echo "If the drive unlocks as expected, you may optionally remove the original password used to encrypt the drive and rely completely on the random new one stored in the TPM2.  If you do this, you should keep a copy of the key somewhere outside this system. E.g. printed and kept locked somewhere safe. To get a copy of the key stored in the TPM2, run this command:"
-echo 'echo $(sudo tpm2_nvread 0x1500016)'
+echo "sudo tpm2-getkey"
 echo
 echo "If you remove the original password used to encrypt the drive and don't have a backup copy of the TPM2's key and then experience TPM2, motherboard, or some other failure preventing automatic unlock, you WILL LOSE ACCESS TO EVERYTHING ON THE ENCRYPTED DRIVE(S)! If you are SURE you have a backup of the key you put in the TPM2, and you REALLY want to remove the old password here are the commands for each drive.  Note that this is NOT RECOMMENDED"
 # Iterate over all selected devices
