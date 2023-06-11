@@ -13,6 +13,7 @@ The script has been tested on Ubuntu 20.04 and 22.04 with full disk encryption o
 It will create a new 64 character alpha-numeric random password, store it in the TPM, add it to LUKS, and modify initramfs to pull it from the TPM automatically at boot.  The new key is in addition to the any already used for unlocking the drive.  If the TPM unlocks fails at boot, it will revert to asking you for a passphrase.  You can use either the original one you used to encrypt the drive, or the one that this script added the TPM, if you have a record of it.
 
 # Usage
+
 Download tpm2-luks-unlock.sh, mark it as executable, and run it with sudo or as root e.g.
 
 ```

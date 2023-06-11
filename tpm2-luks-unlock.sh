@@ -318,6 +318,7 @@ exit 0
 EOF
 
 # Set the file ownership and permissions
+
 chown root: /etc/initramfs-tools/hooks/tpm2-decryptkey
 chmod 755 /etc/initramfs-tools/hooks/tpm2-decryptkey
 
@@ -404,4 +405,3 @@ echo "original initramfs for recovery. e.g.:"
 echo
 echo "initrd /initrd.img-$(uname -r).orig"
 echo
-
