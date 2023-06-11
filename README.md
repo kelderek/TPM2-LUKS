@@ -51,3 +51,4 @@ If that also fails, you may be able to boot to a previous kernel version under A
 
 # To Do
 1) Add support for command line parameters
+2) Use proper certificate/PCR based TPM2 procedures rather than storing a raw value
