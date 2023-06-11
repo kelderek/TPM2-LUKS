@@ -26,7 +26,10 @@ if (( $EUID != 0 )); then
 fi
 
 #Get user confirmation
-echo "This script will generate a random alphanumeric key, store it in your TPM2 device, then add it as a LUKS key to an encrypted drive.  It will then create scripts necessary for unlocking the drive automatically at boot by reading the key from the TPM2 device, and update initramfs to include the scripts."
+echo "This script will generate a random alphanumeric key, store it in your TPM2 device,"
+echo "then add it as a LUKS key to an encrypted drive.  It will then create scripts"
+echo "necessary for unlocking the drive automatically at boot by reading the key from"
+echo "the TPM2 device, and update initramfs to include the scripts."
 echo
 while true
 do
@@ -58,7 +61,8 @@ unset CRYPTTAB_DEVICE_SELECTED
 TEMP_DEVICE_NAMES=($(grep -o '^\s*[^#[:space:]]\S*' /etc/crypttab))
 if [ ${#TEMP_DEVICE_NAMES[@]} = 0 ]
 then
-   echo "Could not find any encrypted drives in /etc/crypttab.  Your drive must already be encrypted before running this script."
+   echo "Could not find any encrypted drives in /etc/crypttab."
+   echo "Your drive must already be encrypted before running this script."
    exit
 fi
 #Build parallel arrays consisting of associated device names and paths
@@ -89,10 +93,11 @@ do
    echo "Devices found in crypttab:"
    for I in "${!CRYPTTAB_DEVICE_NAMES[@]}"
    do
-      echo "Index: $I   Selected: ${CRYPTTAB_DEVICE_SELECTED[$I]}   Name: ${CRYPTTAB_DEVICE_NAMES[$I]}   Path: ${CRYPTTAB_DEVICE_PATHS[$I]} $(grep -q "^\s*${CRYPTTAB_DEVICE_NAMES[$I]}.*tpm2-getkey" /etc/crypttab && echo " (already setup to automatically unlock at boot)")"
+      echo "Selected: ${CRYPTTAB_DEVICE_SELECTED[$I]}	Index: $I	Path: ${CRYPTTAB_DEVICE_PATHS[$I]}	Name: ${CRYPTTAB_DEVICE_NAMES[$I]} $(grep -q "^\s*${CRYPTTAB_DEVICE_NAMES[$I]}.*tpm2-getkey" /etc/crypttab && echo " (already setup to automatically unlock at boot)")"
    done  #for I loop
    echo
-   echo "Enter the index numbers of devices separated by spaces to select/unselect them, 'a' to select all devices, 'n' to unselect all devices, or 'd' when done selecting:"
+   echo "Enter the index numbers of devices separated by spaces to select/unselect them"
+   echo "Enter 'a' to select all devices, 'n' to unselect all devices, or 'd' when done:"
    read PROMPT
 
    REGEX='^[0-9]+$'
@@ -144,8 +149,12 @@ KEY=$(tpm2_nvread 0x1500016 2> /dev/null)
 if [ "$KEY" != "" ]
 then # found something is already there
    echo
-   echo "Looks like there is already a key stored in the TPM2 device.  Using the existing key will ensure any other devices depending on it will still automatically unlock at boot."
-   echo "If you choose not to use the existing key, a new key will be generated and any devices using the old key will need to be manually unlocked at boot if you didn't select them this time.  The existing key will NOT be removed from any devices using it and can still be used manually."
+   echo "Looks like there is already a key stored in the TPM2 device."
+   echo "Using the existing key will ensure any other devices depending on it will still"
+   echo "automatically unlock at boot.  If you choose not to use the existing key, a new"
+   echo "key will be generated and any devices using the old key will need to be manually"
+   echo "unlocked at boot if you didn't select them this time.  The existing key"
+   echo "will NOT be removed from any devices using it and can still be used manually."
    while true
    do
       read -p "Do you want to use the existing key? (YES/no) " PROMPT
@@ -189,7 +198,8 @@ then
    tpm2_nvread -s $KEYSIZE 0x1500016 2> /dev/null | diff /root/tpm2.key - > /dev/null
    if [ $? != 0 ]
    then
-      echo "Could not verify the key is stored properly in the TPM2 device.  Cannot proceed!"
+      echo "Could not verify the key is stored properly in the TPM2 device."
+      echo "Cannot proceed!"
       exit
    fi
 fi
@@ -198,7 +208,7 @@ fi
 echo
 echo
 echo
-echo "Adding the new key to LUKS for all selected devices.  You will need to unlock each to add the new key."
+echo "You will need to unlock each selected device to add the new key."
 for I in "${!CRYPTTAB_DEVICE_NAMES[@]}"
 do
    if [ "${CRYPTTAB_DEVICE_SELECTED[$I]}" = "y" ]
@@ -250,7 +260,7 @@ then
    then
       # tmp file exists, meaning we tried the TPM2 this boot, but it didn’t work for the drive and this must be the second
       # or later try to unlock the drive. Either the TPM2 is failed/missing, or has the wrong key stored in it.
-      /lib/cryptsetup/askpass "Automatic disk unlock via TPM failed for (\${CRYPTTAB_SOURCE}) Enter passphrase: "
+      /lib/cryptsetup/askpass "Automatic disk unlock via tpm2-getkey failed for (\${CRYPTTAB_SOURCE}) Enter passphrase: "
       exit
    fi
 
@@ -265,8 +275,7 @@ EOF
 chown root: /usr/local/sbin/tpm2-getkey
 chmod 750 /usr/local/sbin/tpm2-getkey
 
-echo
-echo "Creating initramfs hook and putting it at /etc/initramfs-tools/hooks/tpm2-decryptkey..."
+# Creating initramfs hook and putting it at /etc/initramfs-tools/hooks/tpm2-decryptkey
 cat << EOF > /etc/initramfs-tools/hooks/tpm2-decryptkey
 #!/bin/sh
 PREREQ=""
@@ -294,7 +303,8 @@ chmod 755 /etc/initramfs-tools/hooks/tpm2-decryptkey
 echo
 echo
 echo
-echo "Backing up /etc/crypttab to /etc/crypttab.bak, then updating selected devices to unlock automatically..."
+echo "Backing up /etc/crypttab to /etc/crypttab.bak then updating"
+echo "selected devices to unlock automatically..."
 cp /etc/crypttab /etc/crypttab.bak
 # Iterate over all selected devices, adding keyscript as needed
 for I in "${!CRYPTTAB_DEVICE_NAMES[@]}"
@@ -341,10 +351,22 @@ echo
 echo
 echo
 echo "Before you reboot and try it out, please note the following:"
-echo "If the drive unlocks as expected, you may optionally remove the original password used to encrypt the drive and rely completely on the random new one stored in the TPM2.  If you do this, you should keep a copy of the key somewhere outside this system. E.g. printed and kept locked somewhere safe. To get a copy of the key stored in the TPM2, run this command:"
+echo "If the drive unlocks as expected, you may optionally remove the original password"
+echo "used to encrypt the drive and rely completely on the random new one stored in the"
+echo "TPM2.  If you do this, you should keep a copy of the key somewhere outside this"
+echo "system. E.g. printed and kept locked somewhere safe. To get a copy of the key"
+echo "stored in the TPM2, run this command:"
+echo
 echo "sudo tpm2-getkey"
 echo
-echo "If you remove the original password used to encrypt the drive and don't have a backup copy of the TPM2's key and then experience TPM2, motherboard, or some other failure preventing automatic unlock, you WILL LOSE ACCESS TO EVERYTHING ON THE ENCRYPTED DRIVE(S)! If you are SURE you have a backup of the key you put in the TPM2, and you REALLY want to remove the old password here are the commands for each drive.  Note that this is NOT RECOMMENDED"
+echo "If you remove the original password used to encrypt the drive and don't have a"
+echo "backup copy of the TPM2's key and then experience TPM2, motherboard, or some"
+echo "other failure preventing automatic unlock, you WILL LOSE ACCESS TO EVERYTHING ON"
+echo "THE ENCRYPTED DRIVE(S)!"
+echo
+echo "If you are SURE you have a backup of the key you put in the TPM2, and you REALLY"
+echo "want to remove the old password here are the commands for each drive.  This is NOT RECOMMENDED"
+echo
 # Iterate over all selected devices
 for I in "${!CRYPTTAB_DEVICE_NAMES[@]}"
 do
@@ -355,5 +377,10 @@ do
    fi
 done # for I loop
 echo
-echo "If booting fails, press esc at the beginning of the boot to get to the grub menu.  Edit the Ubuntu entry and add .orig to end of the initrd line to boot to the original initramfs for recovery."
-echo "e.g. initrd /initrd.img-$(uname -r).orig"
+echo "If booting fails, press esc at the beginning of the boot to get to the grub menu."
+echo "Edit the Ubuntu entry and add .orig to end of the initrd line to boot to the"
+echo "original initramfs for recovery. e.g.:"
+echo
+echo "initrd /initrd.img-$(uname -r).orig"
+echo
+
