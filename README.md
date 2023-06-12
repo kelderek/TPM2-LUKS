@@ -17,7 +17,7 @@ It will create a new 64 character alpha-numeric random password, store it in the
 Download tpm2-luks-unlock.sh, mark it as executable, and run it with sudo or as root e.g.
 
 ```
-curl -O https://raw.githubusercontent.com/kelderek/TPM2-LUKS/main/tpm2-luks-unlock.sh
+wget https://raw.githubusercontent.com/kelderek/TPM2-LUKS/main/tpm2-luks-unlock.sh
 chmod +x tpm2-luks-unlock.sh
 sudo ./tpm2-luks-unlock.sh
 ```
