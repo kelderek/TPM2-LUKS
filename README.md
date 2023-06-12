@@ -50,9 +50,5 @@ If that also fails, you may be able to boot to a previous kernel version under A
 1) This only works for TPM 2.0 devices (including AMD fTPM and Intel PTT) but does NOT work for TPM 1.2 devices
 2) Just storing a value in the TPM isn't the best or most secure method.  It is a "good enough" method meant to protect from "normal" threats like a thief stealing your laptop and not a sophisticated attacker with physical and/or root access.  It should also be combined with protections like preventing USB booting and a BIOS password.  See https://run.tournament.org.il/ubuntu-20-04-and-tpm2-encrypted-system-disk/ for further discussion on this from etzion.  If you know how to better use a TPM (e.g. with certificates and/or PCR registers) and would like to contribute, please reach out!
 
-# To Do
-1) Add support for command line parameters
-2) Use proper certificate/PCR based TPM2 procedures rather than storing a raw value
-
 # Acknowledgements
 Thanks to all those who have contributed, particularly etzion and zombiedk!
