@@ -287,7 +287,7 @@ then
    touch \${TMP_FILE}
    tpm2_nvread -s ${KEYSIZE} 0x1500016
 else
-   echo $(tpm2_nvread -s ${KEYSIZE} 0x1500016)
+   echo \$(tpm2_nvread -s ${KEYSIZE} 0x1500016)
 fi
 
 EOF
