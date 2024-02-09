@@ -53,14 +53,14 @@ unset CRYPTTAB_DEVICE_SELECTED
 if ! dpkg -s cryptsetup-bin 1> /dev/null 2> /dev/null
 then
    echo
-   echo "tpm2-tools not detected, installing..."
+   echo "cryptsetup-bin not detected, installing..."
    apt install cryptsetup-bin -y
 fi
 
 if ! dpkg -s initramfs-tools-core 1> /dev/null 2> /dev/null
 then
    echo
-   echo "tpm2-tools not detected, installing..."
+   echo "initramfs-tools-core not detected, installing..."
    apt install initramfs-tools-core -y
 fi
 
